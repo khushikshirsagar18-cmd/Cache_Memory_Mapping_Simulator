@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cache Memory Mapping Simulator | COA Micro Project</title>
+<style>
+:root{--navy:#12233f;--blue:#2d68e8;--pale:#edf4ff;--bg:#f4f7fb;--ink:#1c293b;--muted:#64748b;--line:#dbe4ef;--green:#14835d;--red:#c34b4b;--amber:#9a650b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px/1.5 "Segoe UI",Arial,sans-serif;color:var(--ink)}
+header{padding:28px max(20px,calc((100% - 1160px)/2));background:linear-gradient(120deg,#12233f,#2459a8);color:white}
+header .tag{font-size:12px;letter-spacing:.8px;border:1px solid #ffffff55;background:#ffffff18;padding:5px 10px;border-radius:20px}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.2;margin:14px 0 8px}header p{margin:0;color:#e0eaff;max-width:800px}
+main{max-width:1160px;margin:22px auto;padding:0 18px 34px}.card{background:white;border:1px solid var(--line);border-radius:15px;padding:18px;margin-bottom:16px;box-shadow:0 5px 20px #1b36540a}
+h2{font-size:19px;color:var(--navy);margin:0 0 13px}h3{font-size:15px;color:var(--navy);margin:0 0 8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+label{display:block;font-size:13px;font-weight:700;color:#47566b;margin-bottom:5px}input,select,textarea{width:100%;padding:10px 11px;border:1px solid #cbd7e6;border-radius:9px;font:inherit;background:#fff;color:var(--ink)}textarea{font-family:Consolas,monospace;min-height:88px}
+button{border:0;border-radius:9px;padding:10px 14px;background:var(--blue);color:white;font-weight:700;cursor:pointer}button.secondary{background:#eaf0fa;color:#274361}button.dark{background:var(--navy)}button:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.hint{font-size:12px;color:var(--muted);margin-top:5px}.mode-desc{background:#f7f9fd;border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px;font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.stat{border:1px solid var(--line);background:#f8fafd;border-radius:10px;padding:11px}.stat small{display:block;color:var(--muted)}.stat strong{display:block;font-size:22px;color:var(--navy)}
+.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{background:#f1f5fb;color:#40516a}tbody tr:last-child td{border-bottom:0}.empty{text-align:center;color:var(--muted);padding:18px}
+.cachegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:9px}.linebox{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafcff;min-height:87px}.linebox.hit{border-color:#75c6a5;background:#effaf5}.linebox.miss{border-color:#e7b3b3;background:#fff5f5}.linebox b{display:block;color:var(--navy)}.linebox small{color:var(--muted);display:block}.pill{display:inline-block;font-size:11px;border-radius:20px;padding:2px 7px;background:#e9eef7;color:#344c6d;font-weight:700}.good{background:#dcf7e9;color:#126746}.bad{background:#ffe6e6;color:#a82d2d}
+.message{border-radius:10px;background:#eff6ff;border:1px solid #cfe0ff;color:#214b83;padding:11px 13px;margin-top:12px}.log{white-space:pre-wrap;max-height:220px;overflow:auto;background:#101d30;color:#e6efff;border-radius:10px;padding:13px;font:12px/1.65 Consolas,monospace}
+footer{text-align:center;font-size:12px;color:var(--muted);padding:8px}
+@media(max-width:760px){.controls{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+ <span class="tag">COMPUTER ORGANIZATION & ARCHITECTURE • CO5 MICRO PROJECT</span>
+ <h1>Cache Memory Mapping Simulator</h1>
+ <p>Explore Direct, Fully Associative, and Set-Associative cache mapping. Change cache settings, step through memory addresses, and observe hits, misses, and cache contents.</p>
+</header>
+<main>
+ <section class="card">
+  <h2>1. Configure the cache</h2>
+  <div class="controls">
+   <div><label for="mapping">Mapping technique</label><select id="mapping"><option value="direct">Direct Mapping</option><option value="assoc">Fully Associative</option><option value="set">2-Way Set-Associative</option></select></div>
+   <div><label for="cacheSize">Cache size (bytes)</label><select id="cacheSize"><option>16</option><option selected>32</option><option>64</option><option>128</option></select></div>
+   <div><label for="blockSize">Block size (bytes)</label><select id="blockSize"><option>1</option><option>2</option><option selected>4</option><option>8</option><option>16</option></select></div>
+   <div><label for="addressLimit">Main memory (bytes)</label><select id="addressLimit"><option>64</option><option selected>256</option><option>1024</option><option>4096</option></select></div>
+  </div>
+  <div class="mode-desc" id="modeDesc">Direct mapping: each main-memory block has exactly one possible cache line.</div>
+  <div style="margin-top:14px">
+   <label for="addresses">Memory address sequence (decimal, separated by commas or spaces)</label>
+   <textarea id="addresses" spellcheck="false">0, 4, 8, 0, 16, 4, 32, 0, 8, 16</textarea>
+   <div class="hint">Example: 0, 4, 8, 0. Repeated addresses may produce hits when their block is still in cache. Addresses must be within the selected main-memory size.</div>
+  </div>
+  <div class="row" style="margin-top:13px"><button id="applyBtn">Apply Settings & Reset</button><button id="exampleBtn" class="secondary">Load Example Sequence</button><button id="compareBtn" class="dark">Compare All 3 Methods</button></div>
+  <div id="error" class="message" style="display:none" role="alert"></div>
+ </section>
+ <section class="card">
+  <h2>2. Step-by-step simulation</h2>
+  <div class="stats">
+   <div class="stat"><small>Access position</small><strong id="position">0 / 10</strong></div>
+   <div class="stat"><small>Cache hits</small><strong id="hits">0</strong></div>
+   <div class="stat"><small>Cache misses</small><strong id="misses">0</strong></div>
+   <div class="stat"><small>Hit rate</small><strong id="hitRate">0%</strong></div>
+  </div>
+  <div class="row" style="margin-top:13px"><button id="stepBtn">Process Next Address →</button><button id="runBtn" class="dark">Run All</button><button id="resetBtn" class="secondary">Reset Simulation</button></div>
+  <div id="message" class="message" role="status">Apply settings, then process the next address to see its mapping.</div>
+ </section>
+ <section class="card">
+  <h2>3. Address calculation</h2>
+  <p class="hint">For a memory address: memory block = floor(address ÷ block size); block offset = address mod block size. Index and tag depend on the mapping technique.</p>
+  <div class="tablewrap"><table><thead><tr><th>Address</th><th>Memory block</th><th>Block offset</th><th>Cache line / set</th><th>Tag</th><th>Result</th><th>Reason</th></tr></thead><tbody id="calcRows"><tr><td colspan="7" class="empty">No addresses processed yet.</td></tr></tbody></table></div>
+ </section>
+ <section class="card">
+  <h2>4. Current cache contents</h2>
+  <div id="cacheGrid" class="cachegrid"></div>
+  <p class="hint">Each slot shows the memory block currently stored there. A miss loads the requested block; if the target slot is occupied, the previous block is replaced.</p>
+ </section>
+ <section class="card">
+  <h2>5. Compare mapping techniques</h2>
+  <div class="tablewrap"><table><thead><tr><th>Technique</th><th>Cache slots</th><th>Hits</th><th>Misses</th><th>Hit rate</th><th>Key rule</th></tr></thead><tbody id="compareRows"><tr><td colspan="6" class="empty">Click “Compare All 3 Methods” to compare the same address sequence.</td></tr></tbody></table></div>
+  <div id="compareNote" class="hint"></div>
+ </section>
+ <section class="card">
+  <h2>6. Theory to explain in your viva</h2>
+  <div class="grid">
+   <div><h3>Cache hit</h3><p>A hit occurs when the requested memory block is already present in cache. The CPU can access the cached data quickly.</p><h3>Cache miss</h3><p>A miss occurs when the requested block is not in cache. The block must be brought from main memory.</p></div>
+   <div><h3>Mapping rules</h3><ul><li><b>Direct:</b> line = block number mod number of cache lines.</li><li><b>Fully associative:</b> the block can occupy any cache line.</li><li><b>2-way set associative:</b> set = block number mod number of sets; the block can occupy either way in that set.</li></ul></div>
+  </div>
+  <p class="hint"><b>Replacement policy:</b> this model uses FIFO within a set / fully associative cache when a replacement is required. Direct mapping always replaces the block in its assigned line.</p>
+ </section>
+ <section class="card">
+  <h2>7. Simulation log</h2><div class="log" id="log">Welcome. Configure your cache to begin.\n</div><div class="row" style="margin-top:10px"><button id="clearLogBtn" class="secondary">Clear Log</button></div>
+ </section>
+ <footer>COA Micro Project • Cache Memory Mapping Simulator • Standalone HTML, CSS and JavaScript</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const descriptions={
+ direct:'Direct mapping: each main-memory block has exactly one possible cache line. Line = block number mod total cache lines.',
+ assoc:'Fully associative mapping: a memory block can be placed in any cache line. On a full cache, the oldest loaded block is replaced (FIFO).',
+ set:'2-way set-associative mapping: cache is divided into sets with two lines each. Set = block number mod number of sets; a block may occupy either way in that set.'
+};
+let cfg={}, sequence=[], cache=[], history=[], cursor=0, hits=0, misses=0, lastSlot=-1;
+function readConfig(){
+ const cacheSize=Number($('cacheSize').value), blockSize=Number($('blockSize').value), memorySize=Number($('addressLimit').value), mapping=$('mapping').value;
+ if(blockSize>cacheSize) throw Error('Block size cannot be larger than cache size.');
+ if(cacheSize%blockSize!==0) throw Error('Cache size must be divisible by block size.');
+ const lines=cacheSize/blockSize;
+ if(mapping==='set'&&lines<2) throw Error('2-way set-associative mapping needs at least two cache lines.');
+ const seq=$('addresses').value.trim().split(/[\s,;]+/).filter(Boolean).map(x=>{
+  if(!/^\d+$/.test(x))throw Error('Use non-negative whole-number memory addresses, separated by commas or spaces.');
+  const n=Number(x);if(n>=memorySize)throw Error(`Address ${n} is outside the selected memory range (0–${memorySize-1}).`);return n;
+ });
+ if(!seq.length)throw Error('Enter at least one memory address.');
+ cfg={cacheSize,blockSize,memorySize,mapping,lines,sets:mapping==='set'?lines/2:lines};
+ sequence=seq;cache=Array(lines).fill(null).map(()=>({block:null,loadedAt:Infinity}));history=[];cursor=0;hits=0;misses=0;lastSlot=-1;
+ $('error').style.display='none';$('modeDesc').textContent=descriptions[mapping];$('message').textContent='Settings applied. Process the first address to see the mapping calculation.';
+ $('log').textContent=`Configuration loaded: ${mappingName(mapping)}, cache=${cacheSize} bytes, block=${blockSize} bytes, lines=${lines}, main memory=${memorySize} bytes.\n`;
+ $('compareRows').innerHTML='<tr><td colspan="6" class="empty">Click “Compare All 3 Methods” to compare the same address sequence.</td></tr>';$('compareNote').textContent='';
+ render();
+}
+function mappingName(m){return {direct:'Direct Mapping',assoc:'Fully Associative',set:'2-Way Set-Associative'}[m]}
+function simulateOne(state,address,index,config){
+ const block=Math.floor(address/config.blockSize),offset=address%config.blockSize;
+ let slot=-1,tag=0,setNo=null,reason='',hit=false, candidates=[];
+ if(config.mapping==='direct'){
+  slot=block%config.lines;tag=Math.floor(block/config.lines);candidates=[slot];
+ }else if(config.mapping==='assoc'){
+  candidates=Array.from({length:config.lines},(_,i)=>i);tag=block;
+ }else{
+  setNo=block%config.sets;tag=Math.floor(block/config.sets);
+  candidates=Array.from({length:2},(_,way)=>setNo*2+way);
+ }
+ const found=candidates.find(i=>state[i].block===block);
+ if(found!==undefined){hit=true;slot=found;reason=`Block ${block} is already in cache slot ${slot}.`;}
+ else{
+  const empty=candidates.find(i=>state[i].block===null);
+  if(empty!==undefined){slot=empty;reason=`Block ${block} is absent; empty slot ${slot} is used.`;}
+  else{
+   slot=candidates.reduce((old,i)=>state[i].loadedAt<state[old].loadedAt?i:old,candidates[0]);
+   reason=`Miss: target ${config.mapping==='set'?'set':'cache'} is full; FIFO replaces block ${state[slot].block} in slot ${slot}.`;
+  }
+  state[slot]={block,loadedAt:index};
+ }
+ return {address,block,offset,slot,tag,setNo,hit,reason};
+}
+function processNext(){
+ if(cursor>=sequence.length)return;
+ const item=simulateOne(cache,sequence[cursor],cursor,cfg);history.push(item);cursor++;
+ if(item.hit)hits++;else misses++;lastSlot=item.slot;
+ $('message').innerHTML=`<b>${item.hit?'CACHE HIT':'CACHE MISS'}</b> — Address ${item.address} → memory block ${item.block}, offset ${item.offset}. ${escapeHTML(item.reason)}`;
+ $('log').textContent+=`Access ${cursor}: address=${item.address}, block=${item.block}, offset=${item.offset}, ${item.hit?'HIT':'MISS'}, slot=${item.slot}, tag=${item.tag}. ${item.reason}\n`;$('log').scrollTop=$('log').scrollHeight;
+ render();
+}
+function escapeHTML(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function render(){
+ $('position').textContent=`${cursor} / ${sequence.length||0}`;$('hits').textContent=hits;$('misses').textContent=misses;$('hitRate').textContent=(cursor?((hits/cursor)*100).toFixed(1):'0')+'%';
+ $('stepBtn').disabled=cursor>=sequence.length;$('runBtn').disabled=cursor>=sequence.length;
+ $('calcRows').innerHTML=history.length?history.map(x=>`<tr><td>${x.address}</td><td>${x.block}</td><td>${x.offset}</td><td>${cfg.mapping==='set'?'Set '+x.setNo+' / slot '+x.slot:'Line '+x.slot}</td><td>${x.tag}</td><td><span class="pill ${x.hit?'good':'bad'}">${x.hit?'HIT':'MISS'}</span></td><td>${escapeHTML(x.reason)}</td></tr>`).reverse().join(''):'<tr><td colspan="7" class="empty">No addresses processed yet.</td></tr>';
+ $('cacheGrid').innerHTML=cache.map((s,i)=>`<div class="linebox ${i===lastSlot&&history.length?(history[history.length-1].hit?'hit':'miss'):''}"><b>Slot ${i}</b><small>${cfg.mapping==='set'?'Set '+Math.floor(i/2)+' · Way '+(i%2):cfg.mapping==='direct'?'Direct line':'Any line'}</small><div style="margin-top:7px">${s.block===null?'<span class="pill">Empty</span>':`<span class="pill">Block ${s.block}</span><br><small>Bytes ${s.block*cfg.blockSize}–${s.block*cfg.blockSize+cfg.blockSize-1}</small>`}</div></div>`).join('');
+}
+function runAll(){while(cursor<sequence.length)processNext()}
+function compareAll(){
+ try{if(!sequence.length)readConfig();}catch(e){showError(e.message);return}
+ const results=['direct','assoc','set'].map(mapping=>{
+  const conf={...cfg,mapping,sets:mapping==='set'?(cfg.lines/2):cfg.lines};
+  if(mapping==='set'&&conf.lines<2)return {mapping,hits:0,misses:0,hitRate:0,invalid:true};
+  const state=Array(conf.lines).fill(null).map(()=>({block:null,loadedAt:Infinity}));let h=0,m=0;
+  sequence.forEach((a,i)=>{if(simulateOne(state,a,i,conf).hit)h++;else m++});
+  return {mapping,hits:h,misses:m,hitRate:sequence.length?h/sequence.length*100:0};
+ });
+ $('compareRows').innerHTML=results.map(r=>`<tr><td><b>${mappingName(r.mapping)}</b></td><td>${cfg.lines}</td><td>${r.invalid?'—':r.hits}</td><td>${r.invalid?'—':r.misses}</td><td>${r.invalid?'—':r.hitRate.toFixed(1)+'%'}</td><td>${r.mapping==='direct'?'One fixed line per block':r.mapping==='assoc'?'Any line; FIFO if full':'Two ways per set; FIFO within set'}</td></tr>`).join('');
+ const best=results.filter(r=>!r.invalid).sort((a,b)=>b.hitRate-a.hitRate)[0];
+ $('compareNote').textContent=`All methods use the same ${sequence.length}-address sequence and the same total cache capacity (${cfg.cacheSize} bytes). For this sequence, ${mappingName(best.mapping)} has the highest hit rate (${best.hitRate.toFixed(1)}%). Results depend on the address pattern.`;
+}
+function showError(msg){$('error').textContent=msg;$('error').style.display='block'}
+$('applyBtn').addEventListener('click',()=>{try{readConfig()}catch(e){showError(e.message)}});
+$('exampleBtn').addEventListener('click',()=>{$('addresses').value='0, 4, 8, 0, 16, 4, 32, 0, 8, 16';try{readConfig()}catch(e){showError(e.message)}});
+$('stepBtn').addEventListener('click',processNext);$('runBtn').addEventListener('click',runAll);
+$('resetBtn').addEventListener('click',()=>{try{readConfig()}catch(e){showError(e.message)}});
+$('compareBtn').addEventListener('click',compareAll);
+$('clearLogBtn').addEventListener('click',()=>{$('log').textContent='Log cleared.\n'});
+try{readConfig()}catch(e){showError(e.message)}
+</script>
+</body>
+</html>
